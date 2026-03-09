@@ -6,16 +6,45 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct TimerScreen: View {
     @StateObject private var vm = TimerViewModel()
     @Environment(\.horizontalSizeClass) private var hSizeClass
     @State private var isShowingStats = false
+    @State private var isShowingSettings = false
+    @State private var isExportingCSV = false
+    @State private var isImportingCSV = false
+    @State private var timerTextScale: CGFloat = 1.0
+    @State private var selectedPhoneTab: PhoneTab = .home
+    @State private var importAlertMessage = ""
+    @State private var isShowingImportAlert = false
+
+    private enum PhoneTab {
+        case home
+        case history
+        case stats
+        case settings
+    }
 
     private var selectedNotesBinding: Binding<String> {
         Binding(
             get: { vm.selectedLog?.notes ?? "" },
             set: { vm.updateNotesForSelectedLog($0) }
+        )
+    }
+
+    private var selectedMoodBinding: Binding<Mood> {
+        Binding(
+            get: { vm.selectedLog?.mood ?? .good },
+            set: { vm.updateMoodForSelectedLog($0) }
+        )
+    }
+
+    private var selectedTagsTextBinding: Binding<String> {
+        Binding(
+            get: { vm.selectedLog?.tags.joined(separator: ", ") ?? "" },
+            set: { vm.updateTagsForSelectedLog(from: $0) }
         )
     }
 
@@ -30,40 +59,88 @@ struct TimerScreen: View {
         .sheet(isPresented: $isShowingStats) {
             StatsScreen(vm: vm)
         }
+        .sheet(isPresented: $isShowingSettings) {
+            SettingsScreen(
+                showsDoneButton: true,
+                onImport: { isImportingCSV = true },
+                onExport: { isExportingCSV = true }
+            )
+        }
+        .fileExporter(
+            isPresented: $isExportingCSV,
+            document: vm.csvExportDocument,
+            contentType: .commaSeparatedText,
+            defaultFilename: "FocusFlow-Export"
+        ) { _ in }
+        .fileImporter(
+            isPresented: $isImportingCSV,
+            allowedContentTypes: [.commaSeparatedText]
+        ) { result in
+            handleImport(result)
+        }
+        .alert("Import CSV", isPresented: $isShowingImportAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(importAlertMessage)
+        }
+        .onChange(of: vm.completionEventCount) {
+            animateTimerBounce()
+        }
     }
 
     private var phoneLayout: some View {
-        NavigationStack {
-            VStack(spacing: 18) {
-                timerHeader
-
-                List {
-                    historySection
+        TabView(selection: $selectedPhoneTab) {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        timerHeader
+                        phoneSummaryCards
+                        phoneRecentSection
+                    }
+                    .padding()
                 }
-                .listStyle(.insetGrouped)
-            }
-            .padding()
-            .navigationTitle("FocusFlow")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isShowingStats = true
-                    } label: {
-                        Image(systemName: "chart.bar.xaxis")
+                .navigationTitle("FocusFlow")
+                .overlay(alignment: .bottomTrailing) {
+                    if UserDefaults.standard.object(forKey: "settings.showVersionWatermark") as? Bool ?? true,
+                       vm.isDevModeEnabled {
+                        Text(AppVersion.displayString)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .padding(.trailing, 6)
+                            .padding(.bottom, 6)
+                            .opacity(0.75)
+                            .allowsHitTesting(false)
                     }
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
-                if vm.isDevModeEnabled {
-                    Text(AppVersion.displayString)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .padding(.trailing, 6)
-                        .padding(.bottom, 6)
-                        .opacity(0.75)
-                        .allowsHitTesting(false)
-                }
+            .tabItem {
+                Label("Home", systemImage: "house")
             }
+            .tag(PhoneTab.home)
+
+            NavigationStack {
+                PhoneHistoryScreen(vm: vm)
+            }
+            .tabItem {
+                Label("History", systemImage: "clock.arrow.circlepath")
+            }
+            .tag(PhoneTab.history)
+
+            StatsScreen(vm: vm, showsDoneButton: false)
+                .tabItem {
+                    Label("Stats", systemImage: "chart.bar.xaxis")
+                }
+                .tag(PhoneTab.stats)
+
+            SettingsScreen(
+                showsDoneButton: false,
+                onImport: { isImportingCSV = true },
+                onExport: { isExportingCSV = true }
+            )
+            .tabItem {
+                Label("Settings", systemImage: "gearshape")
+            }
+            .tag(PhoneTab.settings)
         }
     }
 
@@ -88,19 +165,46 @@ struct TimerScreen: View {
                     }
                 }
 
+                Section {
+                    Picker("Filter", selection: $vm.historyFilter) {
+                        ForEach(TimerViewModel.HistoryFilter.allCases) { filter in
+                            Text(filter.rawValue).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 Section("History") {
-                    if vm.history.isEmpty {
-                        Text("No sessions yet.")
+                    if vm.filteredHistory.isEmpty {
+                        Text(vm.searchText.isEmpty ? "No matching sessions." : "No results for your search.")
                             .foregroundStyle(.secondary)
                     } else {
-                        ForEach(vm.history) { item in
+                        ForEach(vm.filteredHistory) { item in
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(item.session.rawValue)
-                                        .font(.headline)
+                                    HStack(spacing: 6) {
+                                        Text(item.session.rawValue)
+                                            .font(.headline)
+                                        Text(item.mood.emoji)
+                                    }
+
                                     Text(item.date, style: .date)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+
+                                    if !item.tags.isEmpty {
+                                        Text(item.tags.joined(separator: " • "))
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
+
+                                    if !item.notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        Text(item.notes)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
                                 }
                                 Spacer()
                                 Text("\(item.minutes) min")
@@ -108,12 +212,29 @@ struct TimerScreen: View {
                                     .foregroundStyle(.secondary)
                             }
                             .tag(item.id)
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    if let index = vm.filteredHistory.firstIndex(where: { $0.id == item.id }) {
+                                        vm.deleteFilteredHistory(at: IndexSet(integer: index))
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+
+                                Button {
+                                    vm.clearNotes(for: item.id)
+                                } label: {
+                                    Label("Clear Notes", systemImage: "eraser")
+                                }
+                                .tint(.orange)
+                            }
                         }
-                        .onDelete(perform: vm.deleteHistory)
+                        .onDelete(perform: vm.deleteFilteredHistory)
                     }
                 }
             }
             .navigationTitle("History")
+            .searchable(text: $vm.searchText, prompt: "Search history")
         } detail: {
             NavigationStack {
                 VStack(spacing: 0) {
@@ -138,23 +259,32 @@ struct TimerScreen: View {
                     } else {
                         HistoryDetailView(
                             log: vm.selectedLog,
-                            notes: selectedNotesBinding
+                            notes: selectedNotesBinding,
+                            mood: selectedMoodBinding,
+                            tagsText: selectedTagsTextBinding
                         )
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
                 .navigationTitle("FocusFlow")
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
                         Button {
                             isShowingStats = true
                         } label: {
                             Image(systemName: "chart.bar.xaxis")
                         }
+
+                        Button {
+                            isShowingSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    if vm.isDevModeEnabled {
+                    if UserDefaults.standard.object(forKey: "settings.showVersionWatermark") as? Bool ?? true,
+                       vm.isDevModeEnabled {
                         Text(AppVersion.displayString)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -169,7 +299,7 @@ struct TimerScreen: View {
     }
 
     private var timerHeader: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             Picker("Session", selection: $vm.selectedSession) {
                 ForEach(TimerViewModel.Session.allCases) { session in
                     Text(session.rawValue).tag(session)
@@ -177,78 +307,171 @@ struct TimerScreen: View {
             }
             .pickerStyle(.segmented)
 
-            Text(vm.formattedTime())
-                .font(.system(size: 72, weight: .bold, design: .rounded))
-                .monospacedDigit()
-                .padding(.top, 6)
+            ZStack {
+                TimerProgressRing(
+                    progress: vm.timerProgress,
+                    ringColor: vm.timerRingColor,
+                    isRunning: vm.isRunning
+                )
+                .frame(width: 196, height: 196)
 
-            HStack(spacing: 12) {
-                Button {
-                    vm.toggleStartPause()
-                } label: {
-                    Text(vm.isRunning ? "Pause" : "Start")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button {
-                    vm.reset()
-                } label: {
-                    Text("Reset")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
+                Text(vm.formattedTime())
+                    .font(.system(size: 44, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(vm.timerRingColor)
+                    .scaleEffect(timerTextScale)
             }
+            .padding(.top, 4)
 
-            Toggle(isOn: $vm.isDevModeEnabled) {
-                Text("Dev Mode (short timers)")
+            HStack(spacing: 14) {
+                GlassActionButton(
+                    title: vm.isRunning ? "Pause" : "Start",
+                    systemImage: vm.isRunning ? "pause.fill" : "play.fill",
+                    tint: vm.timerRingColor
+                ) {
+                    vm.toggleStartPause()
+                }
+
+                GlassActionButton(
+                    title: "Reset",
+                    systemImage: "arrow.counterclockwise",
+                    tint: .secondary
+                ) {
+                    vm.reset()
+                }
             }
         }
     }
 
-    @ViewBuilder
-    private var historySection: some View {
-        Section {
+    private var phoneSummaryCards: some View {
+        HStack(spacing: 12) {
+            phoneCard(
+                title: "Today",
+                value: "\(vm.todayFocusMinutes) min"
+            )
+
+            phoneCard(
+                title: "Sessions",
+                value: "\(vm.totalFocusSessions)"
+            )
+        }
+    }
+
+    private func phoneCard(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.title3)
+                .fontWeight(.bold)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(Color(.secondarySystemBackground))
+        )
+    }
+
+    private var phoneRecentSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Today")
-                        .font(.headline)
-                    Text("\(vm.todayFocusMinutes) min focus")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Recent Session")
+                    .font(.headline)
+
                 Spacer()
-                Button(role: .destructive) {
-                    vm.clearHistory()
-                } label: {
-                    Text("Clear")
+
+                Button("See All") {
+                    selectedPhoneTab = .history
+                }
+                .font(.subheadline)
+            }
+
+            if vm.recentHistory.isEmpty {
+                Text("No sessions yet. Finish a focus session and it will appear here.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 18)
+                            .fill(Color(.secondarySystemBackground))
+                    )
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(vm.recentHistory) { item in
+                        NavigationLink {
+                            PhoneLogDetailScreen(vm: vm, logID: item.id)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    HStack(spacing: 6) {
+                                        Text(item.session.rawValue)
+                                            .font(.headline)
+                                        Text(item.mood.emoji)
+                                    }
+
+                                    Spacer()
+
+                                    Text("\(item.minutes) min")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Text(item.date.formatted(date: .abbreviated, time: .shortened))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                if !item.tags.isEmpty {
+                                    Text(item.tags.joined(separator: " • "))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(
+                                RoundedRectangle(cornerRadius: 18)
+                                    .fill(Color(.secondarySystemBackground))
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
+    }
 
-        Section("History") {
-            if vm.history.isEmpty {
-                Text("No sessions yet. Finish a Focus session to log it.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(vm.history) { item in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(item.session.rawValue)
-                                .font(.headline)
-                            Text(item.date, style: .date)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Text("\(item.minutes) min")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 4)
-                }
-                .onDelete(perform: vm.deleteHistory)
+    private func animateTimerBounce() {
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.58)) {
+            timerTextScale = 1.08
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                timerTextScale = 1.0
             }
+        }
+    }
+
+    private func handleImport(_ result: Result<URL, Error>) {
+        switch result {
+        case .success(let url):
+            do {
+                let count = try vm.importCSV(from: url)
+                importAlertMessage = "Imported \(count) session(s)."
+            } catch {
+                importAlertMessage = "Import failed: \(error.localizedDescription)"
+            }
+            isShowingImportAlert = true
+
+        case .failure(let error):
+            importAlertMessage = "Import failed: \(error.localizedDescription)"
+            isShowingImportAlert = true
         }
     }
 }

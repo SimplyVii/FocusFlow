@@ -10,6 +10,8 @@ import Charts
 
 struct StatsScreen: View {
     @ObservedObject var vm: TimerViewModel
+    var showsDoneButton: Bool = true
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -44,9 +46,11 @@ struct StatsScreen: View {
             }
             .navigationTitle("Stats")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") {
-                        dismiss()
+                if showsDoneButton {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") {
+                            dismiss()
+                        }
                     }
                 }
             }

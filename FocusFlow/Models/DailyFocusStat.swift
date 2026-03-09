@@ -6,3 +6,9 @@
 //
 
 import Foundation
+
+struct DailyFocusStat: Identifiable {
+    let id = UUID()
+    let date: Date
+    let minutes: Int
+}
