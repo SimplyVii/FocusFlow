@@ -74,14 +74,17 @@ It is feature-complete for that purpose and demonstrates the intended developmen
 ## Screenshots
 
 ### iPhone
-![Home](Screenshots/iphone-home.png)
-![History](Screenshots/iphone-history.png)
-![Detail](Screenshots/iphone-detail.png)
-![Stats](Screenshots/iphone-stats.png)
+<p align="center">
+  <img src="Screenshots/iphone-home.png" alt="Home" width="180">
+  <img src="Screenshots/iphone-history.png" alt="History" width="180">
+  <img src="Screenshots/iphone-detail.png" alt="Detail" width="180">
+  <img src="Screenshots/iphone-stats.png" alt="Stats" width="180">
+</p>
 
 ### iPad
-![Split View](Screenshots/ipad-splitview.png)
-
+<p align="center">
+  <img src="Screenshots/ipad-splitview.png" alt="Split View" width="750">
+</p>
 
 ## Project Structure
 
