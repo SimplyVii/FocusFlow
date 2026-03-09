@@ -10,9 +10,26 @@
 		44C330092F5AD7E50031BB9D /* FocusFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FocusFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		44C330552F5EF8F50031BB9D /* Exceptions for "FocusFlow" folder in "FocusFlow" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Screenshots/ipad-splitview.png",
+				"Screenshots/iphone-detail.png",
+				"Screenshots/iphone-history.png",
+				"Screenshots/iphone-home.png",
+				"Screenshots/iphone-stats.png",
+			);
+			target = 44C330082F5AD7E50031BB9D /* FocusFlow */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		44C3300B2F5AD7E50031BB9D /* FocusFlow */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				44C330552F5EF8F50031BB9D /* Exceptions for "FocusFlow" folder in "FocusFlow" target */,
+			);
 			path = FocusFlow;
 			sourceTree = "<group>";
 		};
