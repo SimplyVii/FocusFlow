@@ -71,6 +71,17 @@ Status
 This project is intentionally scoped as a focused iOS application sample for an apprenticeship portfolio.
 It is feature-complete for that purpose and demonstrates the intended development skills clearly.
 
+## Screenshots
+
+### iPhone
+![Home](screenshots/iphone-home.png)
+![History](screenshots/iphone-history.png)
+![Detail](screenshots/iphone-detail.png)
+![Stats](screenshots/iphone-stats.png)
+
+### iPad
+![Split View](screenshots/ipad-splitview.png)
+
 
 ## Project Structure
 
