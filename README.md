@@ -38,20 +38,7 @@ This allowed me to practice building interfaces that feel native on different Ap
 - CSV import/export using native file handling
 - Reusable custom components for buttons, timer ring, and detail views
 
-## Project Structure
-
-```text
-FocusFlow
-├── App
-├── Models
-├── ViewModels
-├── Views
-│   ├── Components
-│   └── Screens
-├── Resources
-└── Documentation
-
-Why this project
+## Why this project
 
 The goal of this project was not just to build a timer, but to create a small product-like iOS app that demonstrates practical development skills relevant for an apprenticeship.
 
@@ -83,3 +70,18 @@ Status
 
 This project is intentionally scoped as a focused iOS application sample for an apprenticeship portfolio.
 It is feature-complete for that purpose and demonstrates the intended development skills clearly.
+
+
+## Project Structure
+
+```text
+FocusFlow
+├── App
+├── Models
+├── ViewModels
+├── Views
+│   ├── Components
+│   └── Screens
+├── Resources
+└── Documentation
+
