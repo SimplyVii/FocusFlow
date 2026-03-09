@@ -74,13 +74,13 @@ It is feature-complete for that purpose and demonstrates the intended developmen
 ## Screenshots
 
 ### iPhone
-![Home](screenshots/iphone-home.png)
-![History](screenshots/iphone-history.png)
-![Detail](screenshots/iphone-detail.png)
-![Stats](screenshots/iphone-stats.png)
+![Home](Screenshots/iphone-home.png)
+![History](Screenshots/iphone-history.png)
+![Detail](Screenshots/iphone-detail.png)
+![Stats](Screenshots/iphone-stats.png)
 
 ### iPad
-![Split View](screenshots/ipad-splitview.png)
+![Split View](Screenshots/ipad-splitview.png)
 
 
 ## Project Structure
